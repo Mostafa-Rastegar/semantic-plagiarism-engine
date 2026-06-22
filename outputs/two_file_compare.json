@@ -1,0 +1,12 @@
+{
+  "file_a": "data\\sample_corpus\\doc_01.txt",
+  "file_b": "data\\sample_corpus\\doc_02.txt",
+  "shingle_size": 3,
+  "num_perm": 128,
+  "ngram": 1,
+  "jaccard_exact": 0.2807,
+  "jaccard_minhash_estimate": 0.2734,
+  "simhash_similarity": 0.6719,
+  "simhash_sig_a_hex": "9775eb27520c5222",
+  "simhash_sig_b_hex": "9d15c9259b0ee2cf"
+}

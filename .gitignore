@@ -1,0 +1,33 @@
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# data
+data/raw/
+data/processed/
+*.pkl
+
+# os
+.DS_Store
+Thumbs.db
+
+# editors
+.vscode/
+.idea/
+
+# notebook checkpoints
+.ipynb_checkpoints/
+
+# outputs (keep dir but not big files)
+outputs/*.tmp
+
+# pytest
+.pytest_cache/
+
+# build artifacts
+build/
+dist/

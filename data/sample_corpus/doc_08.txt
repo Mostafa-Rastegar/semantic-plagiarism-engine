@@ -1,0 +1,5 @@
+Quantum mechanics is a fundamental theory in physics that describes the
+behaviour of nature at the atomic and subatomic scale. Unlike classical
+physics, observables in quantum mechanics can take only certain discrete
+values, and pairs of properties such as position and momentum cannot be
+measured simultaneously with arbitrary precision.

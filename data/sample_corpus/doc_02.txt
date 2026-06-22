@@ -1,0 +1,5 @@
+Machine learning, a sub-field of artificial intelligence, deals with building
+systems that learn patterns from data without being explicitly programmed.
+Classical examples are linear regression, decision trees and neural networks.
+During the last decade, deep learning models have reached state-of-the-art
+performance in areas from computer vision to natural language processing.

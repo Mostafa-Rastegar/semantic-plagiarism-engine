@@ -1,0 +1,5 @@
+Machine learning is a branch of artificial intelligence that focuses on building
+systems which can learn patterns from data without being explicitly programmed.
+Classical examples include linear regression, decision trees, and neural networks.
+In recent years, deep learning models have achieved state-of-the-art results in
+fields ranging from computer vision to natural language processing.

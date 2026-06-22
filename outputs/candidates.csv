@@ -1,0 +1,3 @@
+doc_a,doc_b,minhash_jaccard
+doc_01,doc_02,0.4688
+doc_03,doc_04,0.3516

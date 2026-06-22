@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "plagiarism_engine"
+version = "0.1.0"
+description = "Semantic duplicate and near-plagiarism detection (MinHash+LSH and TF-IDF SimHash)."
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.23",
+    "pandas>=1.5",
+    "scikit-learn>=1.2",
+    "tqdm>=4.65",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+plagiarism-engine = "plagiarism_engine.cli:main"
