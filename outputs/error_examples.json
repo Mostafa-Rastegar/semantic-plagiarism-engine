@@ -1,0 +1,116 @@
+{
+  "minhash": {
+    "false_positives": [
+      {
+        "q1": "What is the step by step guide to invest in share market in india?",
+        "q2": "What is the step by step guide to invest in share market?",
+        "similarity": 0.836
+      },
+      {
+        "q1": "What is the story of Kohinoor (Koh-i-Noor) Diamond?",
+        "q2": "What would happen if the Indian government stole the Kohinoor (Koh-i-Noor) diamond back?",
+        "similarity": 0.297
+      },
+      {
+        "q1": "What are the laws to change your status from a student visa to a green card in the US, how do they compare to the immigration laws in Canada?",
+        "q2": "What are the laws to change your status from a student visa to a green card in the US? How do they compare to the immigration laws in Japan?",
+        "similarity": 0.781
+      },
+      {
+        "q1": "Which is the best digital marketing institution in banglore?",
+        "q2": "Which is the best digital marketing institute in Pune?",
+        "similarity": 0.438
+      },
+      {
+        "q1": "What are the questions should not ask on Quora?",
+        "q2": "Which question should I ask on Quora?",
+        "similarity": 0.281
+      }
+    ],
+    "false_negatives": [
+      {
+        "q1": "Astrology: I am a Capricorn Sun Cap moon and cap rising...what does that say about me?",
+        "q2": "I'm a triple Capricorn (Sun, Moon and ascendant in Capricorn) What does this say about me?",
+        "similarity": 0.062
+      },
+      {
+        "q1": "How can I be a good geologist?",
+        "q2": "What should I do to be a great geologist?",
+        "similarity": 0.0
+      },
+      {
+        "q1": "What would a Trump presidency mean for current international master’s students on an F1 visa?",
+        "q2": "How will a Trump presidency affect the students presently in US or planning to study in US?",
+        "similarity": 0.086
+      },
+      {
+        "q1": "What does manipulation mean?",
+        "q2": "What does manipulation means?",
+        "similarity": 0.0
+      },
+      {
+        "q1": "Why are so many Quora users posting questions that are readily answered on Google?",
+        "q2": "Why do people ask Quora questions which can be answered easily by Google?",
+        "similarity": 0.0
+      }
+    ]
+  },
+  "simhash": {
+    "false_positives": [
+      {
+        "q1": "What is the step by step guide to invest in share market in india?",
+        "q2": "What is the step by step guide to invest in share market?",
+        "similarity": 0.875
+      },
+      {
+        "q1": "How can I increase the speed of my internet connection while using a VPN?",
+        "q2": "How can Internet speed be increased by hacking through DNS?",
+        "similarity": 0.719
+      },
+      {
+        "q1": "Which one dissolve in water quikly sugar, salt, methane and carbon di oxide?",
+        "q2": "Which fish would survive in salt water?",
+        "similarity": 0.609
+      },
+      {
+        "q1": "When do you use シ instead of し?",
+        "q2": "When do you use \"&\" instead of \"and\"?",
+        "similarity": 0.703
+      },
+      {
+        "q1": "Motorola (company): Can I hack my Charter Motorolla DCX3400?",
+        "q2": "How do I hack Motorola DCX3400 for free internet?",
+        "similarity": 0.719
+      }
+    ],
+    "false_negatives": [
+      {
+        "q1": "How do we prepare for UPSC?",
+        "q2": "How do I prepare for civil service?",
+        "similarity": 0.5
+      },
+      {
+        "q1": "How is the new Harry Potter book 'Harry Potter and the Cursed Child'?",
+        "q2": "How bad is the new book by J.K Rowling?",
+        "similarity": 0.578
+      },
+      {
+        "q1": "What causes a nightmare?",
+        "q2": "What causes nightmares that seem real?",
+        "similarity": 0.422
+      },
+      {
+        "q1": "Why my question was marked as needing imrovement?",
+        "q2": "How can I ask a question without getting marked as ‘need to improve’?",
+        "similarity": 0.594
+      },
+      {
+        "q1": "Which is the best earphone with deep bass under 1000?",
+        "q2": "Which is the Best earphones under Rs 1000?",
+        "similarity": 0.484
+      }
+    ]
+  },
+  "both_wrong_count": 977,
+  "total_pairs": 5000
+}
