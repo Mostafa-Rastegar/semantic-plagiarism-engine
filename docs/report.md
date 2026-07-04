@@ -9,174 +9,157 @@
 
 ## ۱. مقدمه
 
-هدف این پروژه طراحی و پیاده‌سازی یک موتور خط‌فرمان برای تشخیص اسناد مشابه،
-کپی‌شده یا paraphrase شده است. در سامانه‌های واقعی (سامانه‌های ضد سرقت ادبی،
-خوشه‌بندی خبر، de-duplication جست‌وجو و سامانه‌های پرسش‌وپاسخ) لازم است از
-میان میلیون‌ها سند، جفت‌هایی پیدا شوند که محتوای آن‌ها بسیار شبیه است، حتی
-اگر واژه‌ها دقیقاً یکسان نباشند.
+هدف این پروژه پیاده‌سازی یک موتور خط‌فرمان برای تشخیص اسناد مشابه، تکراری یا paraphrase شده است. در سناریوهای واقعی، مانند یافتن اسناد تقریباً تکراری (near-duplicate) در میان یک میلیون سند، محاسبه مستقیم شباهت همه جفت‌ها هزینه‌ی $O(n^2)$ دارد که عملاً غیرممکن است. برای مثال با $n=10^6$ تعداد مقایسه‌ها $\frac{N(N-1)}{2} \cong 5 \times 10^{11}$ می‌شود که با سرعت $10^6$ مقایسه در ثانیه حدود ۵ روز طول می‌کشد. الگوریتم LSH و SimHash دو رویکرد تقریبی هستند که این هزینه را به‌طور چشمگیری کاهش می‌دهند.
 
-دو الگوریتم اصلی پیاده‌سازی و مقایسه شده‌اند:
-
-1. **MinHash + LSH** روی word-shingles
-2. **TF-IDF weighted SimHash** روی توکن‌ها/n-gramها
-
-هیچ کتابخانه آماده‌ای برای MinHash، LSH یا SimHash استفاده نشده و فقط ابزارهای
-عمومی `numpy`، `pandas` و `scikit-learn` به‌عنوان وابستگی‌های جانبی استفاده
-شده‌اند.
+در این پروژه هر دو مسیر پیاده‌سازی و روی دیتاست Quora Question Pairs مقایسه شده‌اند. هیچ کتابخانه‌ی آماده‌ای برای MinHash، LSH یا SimHash استفاده نشده و تنها از `numpy` و `pandas` بهره گرفته‌ایم.
 
 ---
 
-## ۲. پیش‌پردازش متن
+## ۲. پیش‌پردازش متن و شینگلینگ
 
-ماژول `preprocessing.py` مراحل زیر را انجام می‌دهد:
+مطابق مرحله اول الگوریتم LSH، هر سند به مجموعه‌ای از تکه‌های کوچک متن (shingle) تبدیل می‌شود. یک $k$-شینگل برای یک سند، دنباله‌ای از $k$ توکن است که در آن سند ظاهر می‌شود.
 
-1. **نرمال‌سازی unicode** و حذف diacritic‌ها (مهم برای فارسی و عربی).
-2. **یکسان‌سازی letterها:** `ي → ی`، `ك → ک`.
-3. **lowercase** و حذف punctuation با regex یونیکد.
-4. **collapse whitespace**.
-5. **stopword removal** برای انگلیسی و فارسی (لیست دستی).
-6. **shingling** کلمه‌ای با اندازه‌ی پیش‌فرض ۳ (قابل تنظیم).
-7. **مدیریت سندهای کوتاه:** اگر `len(tokens) < k`، مقدار k به طول سند کاهش
-   می‌یابد تا مجموعه‌ی خالی برنگردد و Jaccard NaN نشود.
+مراحل پیش‌پردازش پیاده‌سازی‌شده در `preprocessing.py`:
 
-### چرا shingle می‌سازیم؟
+1. نرمال‌سازی unicode و حذف diacritic‌ها؛
+2. یکسان‌سازی حروف فارسی/عربی (`ي → ی`، `ك → ک`)؛
+3. lowercase و حذف علائم نگارشی با regex یونیکد؛
+4. حذف stopword فارسی و انگلیسی (لیست دستی)؛
+5. shingling کلمه‌ای با اندازه پیشنهادی $k=2..5$؛
+6. مدیریت اسناد کوتاه (اگر $|tokens| < k$، مقدار $k$ به طول سند کاهش می‌یابد تا مجموعه‌ی shingle خالی نشود).
 
-shingleها مجموعه‌ای از زیررشته‌های کلمه‌ای متوالی هستند؛ ترتیب کلمات را تا
-حدی حفظ می‌کنند، در حالی‌که bag-of-words ترتیب را به‌کلی از دست می‌دهد. این
-خاصیت برای تشخیص paraphrase کمی نسبتاً قوی است (هرچه شینگل بزرگ‌تر، حساسیت
-به paraphrase بیشتر).
+### اهمیت انتخاب $k$
 
-### چرا Jaccard مستقیم گران است؟
+مطابق آنچه در جزوه آمده، اگر $k$ کوچک باشد نتایج مثبت کاذب زیاد می‌شود و اگر $k$ بزرگ باشد نتایج منفی کاذب. برای دیتاست Quora که سؤال‌ها کوتاه هستند، $k=2$ در عمل بهترین موازنه را داد.
 
-برای مجموعه‌ای از n سند، محاسبه‌ی $J(A_i, A_j)$ روی همه‌ی جفت‌ها O(n²) جفت
-دارد و هر مقایسه O(|A|+|B|) است. برای n=10⁵ این عملاً امکان‌پذیر نیست.
-MinHash و LSH دقیقاً برای حل این مسأله طراحی شده‌اند.
+### شباهت جاکارد
+
+برای دو مجموعه شینگل $S_1$ و $S_2$:
+$$J(S_1, S_2) = \frac{|S_1 \cap S_2|}{|S_1 \cup S_2|}$$
+
+محاسبه مستقیم روی همه‌ی $\binom{n}{2}$ جفت هزینه‌ی $O(n^2 \cdot m)$ دارد. به همین دلیل به سراغ MinHash می‌رویم.
 
 ---
 
-## ۳. MinHash از صفر
+## ۳. مین‌هش کردن (MinHash)
 
-### ایده
+هدف: تبدیل هر ستون بزرگ ماتریس مشخصه به یک بردار امضای کوچک به گونه‌ای که شباهت جاکارد حفظ شود.
 
-برای دو مجموعه A و B و یک permutation تصادفی $\pi$ روی universe:
+### قضیه‌ی پایه
 
-$$
-\Pr_\pi[\min_\pi(A) = \min_\pi(B)] = J(A, B) = \frac{|A \cap B|}{|A \cup B|}
-$$
+برای دو سند $S_1$ و $S_2$ و یک جایگشت تصادفی $h$:
+$$\Pr\big(h(S_1) = h(S_2)\big) = J(S_1, S_2)$$
 
-اگر K بار با Kتا permutation مستقل این آزمایش را تکرار کنیم، **میانگین تعداد
-برابری‌ها** برآوردگرِ اریب‌نشده‌ی Jaccard است و واریانس آن از مرتبه‌ی $1/K$
-است.
+اگر با $k$ تابع هش مستقل این کار را تکرار کنیم، میانگین تعداد برابری‌ها برآوردگر بی‌اریب $J$ است.
 
-### پیاده‌سازی
+### توابع هش Min-wise مستقل
 
-به جای ساختن permutation کامل روی universe (بسیار بزرگ) از خانواده‌ی universal
-hashing استفاده می‌کنیم:
+ساختن جایگشت واقعی روی سطرهای ماتریس مشخصه (که ممکن است میلیارد سطر داشته باشد) عملی نیست. طبق جزوه از خانواده‌ی زیر استفاده می‌کنیم:
 
-$$
-h_i(x) = (a_i \cdot x + b_i) \mod p
-$$
+$$h_i(x) = (a_i \cdot x + b_i) \mod p$$
 
-- $x = \text{md5}(\text{shingle})[:32\text{bit}]$
-- $p = 2^{61} - 1$ (Mersenne prime)
-- $a_i \in [1, p-1]$ و $b_i \in [0, p-1]$ با seed ثابت تولید می‌شوند
+که در آن $p$ یک عدد اول بزرگ‌تر از تعداد شینگل‌ها است. در پیاده‌سازی، $p = 2^{61}-1$ (Mersenne prime) و $a_i, b_i$ از یک RNG با seed ثابت تولید می‌شوند تا نتایج بازتولیدپذیر باشد.
 
-برای هر سند، signature یک بردار با طول `num_perm` (پیش‌فرض ۱۲۸) است که هر
-خانه‌اش حداقل مقدار $h_i$ روی تمام shingleهای آن سند است.
+### محاسبه امضا
+
+برای هر سند $S_i$ و هر تابع هش $h_r$:
+$$MinHash_r(S_i) = \min_{j} \{ h_r(shingle_j) \mid shingle_j \in S_i \}$$
+
+امضای سند بردار $k$-تایی $Sig(S_i) = [MinHash_1(S_i), \ldots, MinHash_k(S_i)]$ است.
+
+### پیاده‌سازی برداری
+
+در `minhash.py` تمام $k$ تابع هش برای یک سند با یک عمل ماتریسی numpy محاسبه می‌شود:
 
 ```python
 hashed = (self.a[:, None] * x[None, :] + self.b[:, None]) % _LARGE_PRIME
 sig = hashed.min(axis=1)
 ```
 
-broadcasting در numpy اجازه می‌دهد همه‌ی permutationها برای یک سند با یک
-عمل ماتریسی محاسبه شوند.
+### تخمین جاکارد از روی امضاها
 
-### تخمین Jaccard از روی signatures
-
-$$
-\hat{J}(A, B) = \frac{1}{K} \sum_{i=1}^{K} \mathbb{1}[h_i^{\min}(A) = h_i^{\min}(B)]
-$$
-
-```python
-def estimated_jaccard(sig_a, sig_b):
-    return float(np.mean(sig_a == sig_b))
-```
+$$\hat{J}(S_1, S_2) = \frac{1}{k} \sum_{i=1}^{k} \mathbb{1}\big[Sig(S_1, i) = Sig(S_2, i)\big]$$
 
 ---
 
-## ۴. LSH (Locality-Sensitive Hashing)
+## ۴. باند کردن (LSH Banding)
 
-### مشکل
+حتی با MinHash، تعداد جفت‌ها هنوز $O(n^2)$ است. باند‌کردن این تعداد را به شکل هوشمندانه‌ای کاهش می‌دهد.
 
-حتی اگر MinHash هر مقایسه را به O(K) کاهش بدهد، تعداد جفت‌ها هنوز O(n²)
-است. LSH تعداد مقایسه‌ها را به O(n) (با ضریبی که به آستانه بستگی دارد) کاهش
-می‌دهد.
+### تعریف
 
-### راه‌حل: banding
+ماتریس امضا به $b$ باند افقی تقسیم می‌شود، هر باند شامل $r$ سطر، به گونه‌ای که $n = b \cdot r$ (طول امضا). هر باند از هر ستون با یک تابع هش (متفاوت با توابع مرحله MinHash) به یک سطل نگاشت می‌شود. دو ستونی که در حداقل یک باند به یک سطل بیفتند، **جفت کاندید** می‌شوند.
 
-signature طول K را به b تا band با r ردیف تقسیم می‌کنیم (K = b·r). هر band
-به یک bucket هش می‌شود. دو سند **کاندید** هستند اگر در حداقل یک band به
-یک bucket بیفتند.
+### تحلیل احتمال
 
-احتمال این‌که دو سندِ با Jaccard واقعی s کاندید شوند:
+اگر شباهت جاکارد واقعی $s$ باشد:
 
-$$
-P_\text{candidate}(s) = 1 - (1 - s^r)^b
-$$
+- احتمال برابربودن یک باند خاص در دو سند: $s^r$
+- احتمال نابرابربودن آن باند: $1 - s^r$
+- احتمال نابرابربودن تمام $b$ باند: $(1 - s^r)^b$
+- احتمال کاندید شدن (حداقل یک باند مشترک):
 
-این یک S-curve است که در $s \approx (1/b)^{1/r}$ به سرعت از نزدیک صفر به نزدیک یک می‌رود.
+$$P(s) = 1 - (1 - s^r)^b$$
+
+این تابع همان **منحنی S** است.
+
+### نقطه گذار و انتخاب پارامترها
+
+نقطه گذار (بیشترین شیب منحنی S) در حد آستانه‌ی زیر است:
+
+$$t \sim \left(\frac{1}{b}\right)^{1/r}$$
+
+با $n = 128$ که در پیاده‌سازی استفاده کرده‌ایم:
+
+| $b$ | $r$ | آستانه تقریبی $t$ |
+|-----|-----|-------------------|
+| 8   | 16  | 0.84              |
+| 16  | 8   | 0.71              |
+| 32  | 4   | 0.42              |
+| 64  | 2   | 0.125             |
+
+برای داده‌ی paraphrase Quora که جاکارد واقعی $0.2..0.4$ است، انتخاب $b=64, r=2$ (آستانه $\approx 0.125$) منطقی است.
+
+### مثال از تحلیل خطای پیش‌بینی‌شده
+
+اگر امضا با طول ۱۰۰ داشته باشیم و $b=20, r=5$ انتخاب کنیم و شباهت واقعی $s=0.8$ باشد:
+
+- احتمال یکسان‌بودن یک باند: $0.8^5 = 0.328$
+- احتمال نابرابر بودن هر ۲۰ باند: $(1-0.328)^{20} = 0.00035$
+- یعنی حدود $99.965\%$ جفت‌های واقعاً مشابه پیدا می‌شوند و تنها $0.035\%$ منفی کاذب داریم.
+
+برای شباهت $s=0.3$:
+$$1 - (1 - 0.3^5)^{20} = 0.0474$$
+
+یعنی حدود $4.74\%$ مثبت کاذب می‌گیریم که بعد از محاسبه شباهت واقعی حذف می‌شوند.
 
 ### پیاده‌سازی
 
-- ساختمان داده: یک `defaultdict(list)` به ازای هر band.
-- کلید bucket: `md5(band_vals.tobytes())` (stable و بدون collision عملی).
-- در batch mode تابع `candidate_pairs()` همه‌ی جفت‌های هم‌سطل را برمی‌گرداند.
-
-### پارامترها برای num_perm = 128
-
-| bands | rows | threshold تقریبی |
-|-------|------|------------------|
-| 8     | 16   | 0.84             |
-| 16    | 8    | 0.71             |
-| 32    | 4    | 0.42             |
-| 64    | 2    | 0.125            |
-
-برای داده‌ی paraphrase که Jaccard واقعی پایین (0.2-0.4) دارد، انتخاب
-`bands=64` (آستانه ≈ 0.125) منطقی است.
+در `lsh.py` هر باند یک `defaultdict(list)` است. کلید سطل: `md5(band_vals.tobytes())`. تابع `candidate_pairs()` همه‌ی جفت‌های هم‌سطل را برمی‌گرداند.
 
 ---
 
-## ۵. TF-IDF Weighted SimHash
+## ۵. SimHash با وزن‌دهی TF-IDF
 
-### ایده
-
-SimHash هر سند را به یک fingerprint با طول ثابت (۶۴ بیت) نگاشت می‌کند، طوری
-که سندهای مشابه fingerprint با Hamming distance کم داشته باشند.
+مسیر دوم پروژه.
 
 ### الگوریتم
 
-برای هر سند:
+هر سند به یک fingerprint ۶۴ بیتی نگاشت می‌شود:
 
-1. تبدیل به token (یا n-gram).
-2. وزن TF-IDF هر token محاسبه می‌شود.
-3. بردار $v \in \mathbb{R}^{64}$ مقدار اولیه صفر می‌گیرد.
-4. برای هر token $w$ با وزن $W_w$ و hash $h(w)$ ۶۴ بیتی:
-   - برای هر بیت i:
-     - اگر بیت i ام در h(w) برابر ۱ باشد، $v_i \mathrel{+}= W_w$
-     - در غیر این صورت $v_i \mathrel{-}= W_w$
-5. fingerprint نهایی: بیت i ام = ۱ اگر $v_i > 0$، در غیر این صورت ۰.
+1. توکن‌ها یا $n$-gramها استخراج می‌شوند؛
+2. برای هر توکن $w$ وزن TF-IDF محاسبه می‌شود:
+$$idf(t) = \log\left(\frac{1+N}{1+df(t)}\right) + 1, \quad W_w = tf(w,d) \cdot idf(w)$$
+3. برای هر توکن $w$ با هش ۶۴ بیتی $h(w)$، بردار $v \in \mathbb{R}^{64}$ به‌روزرسانی می‌شود:
+   - اگر بیت $i$ ام $h(w)$ برابر ۱ باشد: $v_i \mathrel{+}= W_w$
+   - در غیر این صورت: $v_i \mathrel{-}= W_w$
+4. fingerprint نهایی: بیت $i$ ام برابر ۱ است اگر $v_i > 0$.
 
-### TF-IDF با smoothing
+### شباهت
 
-$$
-\text{idf}(t) = \log\!\left(\frac{1 + N}{1 + \text{df}(t)}\right) + 1, \quad
-W_w = \text{tf}(w, d) \cdot \text{idf}(w)
-$$
+$$sim(d_1, d_2) = 1 - \frac{Hamming(f_1, f_2)}{64}$$
 
 ### پیاده‌سازی برداری
-
-نسخه‌ی numpy:
 
 ```python
 hashes = np.array([hash64(t) for t in toks], dtype=np.uint64)
@@ -186,21 +169,15 @@ signed = (2 * bits - 1).astype(np.float64) * weights[:, None]
 v = signed.sum(axis=0)
 ```
 
-### شباهت
-
-$$
-\text{sim}(d_1, d_2) = 1 - \frac{\text{Hamming}(f_1, f_2)}{64} \in [0, 1]
-$$
-
 ---
 
-## ۶. ساختار CLI
+## ۶. ابزار CLI
 
-سه subcommand در فایل `cli.py`:
+سه subcommand در `cli.py`:
 
-1. **`compare`** — مقایسه‌ی دو فایل و گزارش هر سه شباهت.
-2. **`corpus`** — اجرای MinHash+LSH روی پوشه‌ی فایل‌های `.txt`.
-3. **`pairs`** — ارزیابی روی CSV جفتی برچسب‌دار (Quora) با sweep آستانه.
+1. `compare` — مقایسه‌ی دو فایل و گزارش هر سه معیار (جاکارد دقیق، تخمین MinHash، شباهت SimHash).
+2. `corpus` — اجرای MinHash+LSH روی پوشه‌ی فایل‌های `.txt`، خروجی: جفت‌های کاندید با شباهت.
+3. `pairs` — ارزیابی هر دو روش روی CSV جفتی برچسب‌دار (Quora) با sweep آستانه.
 
 نمونه اجرا در `README.md`.
 
@@ -211,11 +188,11 @@ $$
 ### تنظیمات
 
 - دیتاست: Quora Question Pairs، ۵۰۰۰ سطر اول
-- توزیع برچسب: ۱۹۱۲ duplicate (38.2%) و ۳۰۸۸ non-duplicate (61.8%)
-- `shingle_size = 2`, `num_perm = 128`, `ngram = 1`, `use_idf = True`
-- machine: Windows 11, Python 3.12
+- توزیع برچسب: ۱۹۱۲ duplicate (٪۳۸.۲) و ۳۰۸۸ non-duplicate (٪۶۱.۸)
+- $k=2$، $n_{perm}=128$، $ngram=1$، `use_idf=True`
+- سیستم: Windows 11، Python 3.12
 
-### جدول کامل (از `outputs/metrics.csv`)
+### جدول کامل (`outputs/metrics.csv`)
 
 | method  | threshold | precision | recall | F1     | TP   | FP   | FN   | TN   | runtime (s) |
 |---------|-----------|-----------|--------|--------|------|------|------|------|-------------|
@@ -236,85 +213,62 @@ $$
 
 ### تحلیل
 
-- **بهترین F1:**
-  - MinHash: **0.526** در آستانه 0.20
-  - SimHash: **0.613** در آستانه 0.60
+**بهترین F1:**
+- MinHash: $0.526$ در آستانه $0.20$
+- SimHash: $0.613$ در آستانه $0.60$
 
-- **رفتار رد precision/recall:**
-  - MinHash با افزایش آستانه precision را بالا می‌برد (تا 0.72) ولی recall
-    خیلی سریع افت می‌کند. این دقیقاً ویژگی روش‌های set-based روی متن‌های
-    کوتاه است: paraphrase معمولاً بیش از نصفِ tokenها را عوض می‌کند، پس
-    Jaccard واقعی کم می‌ماند.
-  - SimHash در آستانه‌های پایین recall ≈ ۱ دارد ولی precision حدود 0.38 (که
-    عملاً نسبت positiveها در داده است) — یعنی پیش‌بینی همیشه «duplicate».
-    با بالا رفتن آستانه نقطه‌ی تعادل recall و precision در 0.60 ظاهر می‌شود.
+**رفتار precision/recall:**
 
-- **زمان اجرا:** هر دو روش روی 5000 جفت، حدود ۱ ثانیه برای هر آستانه. عملاً
-  یکسان. SimHash به‌نظر می‌رسد در عمل سریع‌تر باشد چون vector ۶۴ بیتی است،
-  ولی برای متن کوتاه فاصله‌ی محسوسی دیده نشد.
+MinHash با افزایش آستانه precision را تا $0.72$ باال می‌برد ولی recall به‌سرعت افت می‌کند. این دقیقاً ویژگی روش‌های مبتنی بر shingle روی متن کوتاه است: paraphrase در سؤال‌های Quora معمولاً بیش از نصفِ tokenها را عوض می‌کند، پس جاکارد واقعی روی shingle دوتایی کم می‌ماند.
 
-- **برتری SimHash:** روی این دیتاست (سؤال‌های کوتاه با paraphrase شدید
-  vocabulary-level) SimHash برتری روشن دارد. علت اصلی این است که SimHash
-  روی token-level کار می‌کند و TF-IDF کلمات کم‌اطلاعات را خودکار downweight
-  می‌کند، در حالی‌که MinHash روی word-shingle‌های ۲-تایی است که با هر
-  paraphrase اصطلاحاً break می‌شوند.
+SimHash در آستانه‌های پایین recall نزدیک ۱ دارد ولی precision حدود $0.38$ که همان نسبت positive در داده است — یعنی مدل تقریباً همه را duplicate می‌گوید. نقطه‌ی تعادل در آستانه $0.60$ ظاهر می‌شود.
 
-- **برتری بالقوه‌ی MinHash:** روی متن‌های بلندتر (>۱۰۰ کلمه، مثلاً PAN-PC-11)
-  که paraphrase معمولاً فقط بخشی از سند را تغییر می‌دهد، Jaccard روی
-  shingleها بالا می‌ماند و MinHash precision بسیار بهتری می‌دهد. علاوه بر
-  این، MinHash به‌خاطر LSH روی n سند O(n) candidate-generation دارد در
-  حالی‌که SimHash به‌طور پیش‌فرض O(n²) است (مگر با hamming-LSH اضافه).
+**زمان اجرا:** روی ۵۰۰۰ جفت، هر آستانه حدود ۱ ثانیه. تفاوت محسوسی بین دو روش دیده نشد. SimHash روی متن‌های بلندتر انتظار می‌رود سریع‌تر باشد چون هر سند به یک عدد ۶۴ بیتی نگاشت می‌شود.
+
+**علت برتری SimHash روی این دیتاست:** SimHash روی token-level کار می‌کند و TF-IDF کلمات کم‌اطلاعات را خودکار downweight می‌کند. MinHash روی shingle دوتایی است که با هر paraphrase وسیع vocabulary-level تقریباً صفر می‌شود.
+
+**نکته درباره MinHash روی متن بلند:** روی مجموعه‌داده‌هایی مثل PAN-PC-11 که paraphrase معمولاً فقط بخشی از سند را تغییر می‌دهد، Jaccard shingle‌ها بالا می‌ماند و MinHash precision بسیار بهتری می‌دهد. علاوه بر این، LSH روی $n$ سند $O(n)$ candidate-generation دارد در حالی‌که SimHash بدون Hamming-LSH اضافه، $O(n^2)$ می‌ماند.
 
 ---
 
 ## ۸. تحلیل خطا
 
-ابزار `scripts/extract_errors.py` با آستانه‌های بهینه‌ی هر روش، جفت‌هایی که
-سیستم اشتباه پیش‌بینی کرده را استخراج می‌کند. فایل کامل در
-`outputs/error_examples.json`.
+اسکریپت `scripts/extract_errors.py` با آستانه‌ی بهینه‌ی هر روش جفت‌های اشتباه را استخراج کرده و در `outputs/error_examples.json` ذخیره می‌کند.
 
-### MinHash — False Positives (پیش‌بینی duplicate، برچسب 0)
+### MinHash — False Positive (پیش‌بینی duplicate، برچسب ۰)
 
 | # | Q1 | Q2 | sim |
 |---|----|----|-----|
 | 1 | What is the step by step guide to invest in share market in **india**? | What is the step by step guide to invest in share market? | 0.836 |
-| 2 | What are the laws to change your status from a student visa to a green card in the US, how do they compare to the immigration laws in **Canada**? | ... in **Japan**? | 0.781 |
+| 2 | ...student visa to a green card in the US, how do they compare to laws in **Canada**? | ... in **Japan**? | 0.781 |
 | 3 | Which is the best digital marketing institution in **banglore**? | Which is the best digital marketing institute in **Pune**? | 0.438 |
 | 4 | What are the questions should not ask on Quora? | Which question should I ask on Quora? | 0.281 |
 
-**تحلیل:** Quora این دو سؤال را به‌خاطر **تفاوت جزئی در یک کلمه** (یک کشور
-یا یک شهر) duplicate نمی‌داند، ولی Jaccard بالا است (>0.7). از دید
-الگوریتمی این False Positive نیست — تقریباً کل متن یکی است. این یک abuse-
-case‌ی برچسب‌گذاری Quora است که bias annotation را نشان می‌دهد.
+**تحلیل:** در سه مثال اول Quora دو سؤال را به‌خاطر تفاوت جزئی در یک کلمه (کشور یا شهر) duplicate نمی‌داند، ولی جاکارد بالا است. از دید الگوریتمی این عمالً false positive نیست — تقریباً کل shingle‌ها یکی هستند. این نشان‌دهنده‌ی bias در برچسب‌گذاری Quora است، نه ضعف MinHash.
 
-### MinHash — False Negatives (پیش‌بینی 0، برچسب duplicate)
+### MinHash — False Negative (پیش‌بینی ۰، برچسب duplicate)
 
 | # | Q1 | Q2 | sim |
 |---|----|----|-----|
-| 1 | Astrology: I am a Capricorn Sun Cap moon and cap rising...what does that say about me? | I'm a triple Capricorn (Sun, Moon and ascendant in Capricorn) What does this say about me? | 0.062 |
+| 1 | Astrology: I am a Capricorn Sun Cap moon and cap rising... | I'm a triple Capricorn (Sun, Moon and ascendant in Capricorn)... | 0.062 |
 | 2 | How can I be a good geologist? | What should I do to be a great geologist? | 0.0 |
 | 3 | What does manipulation mean? | What does manipulation means? | 0.0 |
 | 4 | Why are so many Quora users posting questions that are readily answered on Google? | Why do people ask Quora questions which can be answered easily by Google? | 0.0 |
 
-**تحلیل:** paraphrase شدید (synonym ها، تغییر ترتیب، تغییر فرم گرامری
-"mean / means"). word-shingle ۲-تایی هیچ tuple مشترکی پیدا نمی‌کند. این
-محدودیت ذاتی MinHash روی متن کوتاه است.
+**تحلیل:** paraphrase شدید با synonym، تغییر فرم گرامری (mean/means)، تغییر ترتیب. shingle دوتایی هیچ tuple مشترکی پیدا نمی‌کند. محدودیت ذاتی MinHash روی سؤالات کوتاه.
 
-### SimHash — False Positives (پیش‌بینی duplicate، برچسب 0)
+### SimHash — False Positive
 
 | # | Q1 | Q2 | sim |
 |---|----|----|-----|
 | 1 | How can I increase the speed of my internet connection while using a VPN? | How can Internet speed be increased by hacking through DNS? | 0.719 |
 | 2 | Which one dissolve in water quickly sugar, salt, methane and carbon dioxide? | Which fish would survive in salt water? | 0.609 |
-| 3 | When do you use シ instead of し? | When do you use \"&\" instead of \"and\"? | 0.703 |
+| 3 | When do you use シ instead of し? | When do you use "&" instead of "and"? | 0.703 |
 | 4 | Motorola: Can I hack my Charter Motorolla DCX3400? | How do I hack Motorola DCX3400 for free internet? | 0.719 |
 
-**تحلیل:** SimHash به اسکلت جمله حساس است؛ هر دو جمله structure سؤالی
-"how/when do you use/increase X instead of/by/...?" دارند. مدل bag-of-tokens
-نمی‌تواند بفهمد که موضوع اصلی متفاوت است. این محدودیت ذاتی SimHash بدون
-semantic embedding است.
+**تحلیل:** SimHash به اسکلت جمله حساس است. هر دو جمله ساختار سؤالی مشابه ("how do you X instead of Y") دارند. مدل bag-of-tokens نمی‌فهمد موضوع اصلی متفاوت است. محدودیت ذاتی SimHash بدون semantic embedding.
 
-### SimHash — False Negatives (پیش‌بینی 0، برچسب duplicate)
+### SimHash — False Negative
 
 | # | Q1 | Q2 | sim |
 |---|----|----|-----|
@@ -322,25 +276,17 @@ semantic embedding است.
 | 2 | How is the new Harry Potter book 'Harry Potter and the Cursed Child'? | How bad is the new book by J.K Rowling? | 0.578 |
 | 3 | What causes a nightmare? | What causes nightmares that seem real? | 0.422 |
 
-**تحلیل:** نیاز به دانش جهانی است (UPSC = civil service exam in India، J.K.
-Rowling = Harry Potter author). هیچ tokenی مشترک نیست. SimHash بدون
-embedding معنایی نمی‌تواند این رابطه را کشف کند.
+**تحلیل:** نیاز به دانش جهانی (UPSC = civil service exam in India، J.K. Rowling = Harry Potter). هیچ tokenی مشترک نیست. SimHash بدون embedding معنایی این را کشف نمی‌کند.
 
-### overlap
+### همپوشانی خطاها
 
-تعداد جفت‌هایی که هر دو روش هم‌زمان اشتباه پیش‌بینی کردند:
-**977 از 5000** (تقریباً 20%). این نشان می‌دهد دو روش خطاهای **مستقل
-نسبتاً مختلفی** دارند — ترکیب آن‌ها (Ensemble: مثلاً OR کردن predictionها در
-آستانه‌های مناسب) می‌تواند recall ترکیبی را بهبود دهد.
+تعداد جفت‌هایی که هر دو روش هم‌زمان اشتباه پیش‌بینی کردند: **۹۷۷ از ۵۰۰۰** (تقریباً $19.5\%$). نتیجه: خطاهای دو روش تا حد خوبی مستقل هستند. ترکیب آن‌ها (Ensemble با OR در آستانه‌های مناسب) می‌تواند recall را بهبود دهد.
 
 ### جمع‌بندی تحلیل خطا
 
-1. روی متن کوتاه با paraphrase vocabulary-level، هیچ‌کدام از دو روش بدون
-   embedding معنایی به F1 > 0.7 نمی‌رسد.
-2. MinHash error pattern → کمبود overlap shingle (FN). SimHash error pattern
-   → similarity ساختاری بدون semantic equivalence (FP).
-3. ترکیب دو روش با weighting (مثلاً $\alpha \cdot J_\text{minhash} + (1-\alpha) \cdot
-   \text{sim}_\text{simhash}$) می‌تواند هر دو نوع خطا را کاهش دهد.
+1. روی متن کوتاه با paraphrase vocabulary-level، هیچ‌یک از دو روش بدون embedding معنایی به F1 بالای $0.7$ نمی‌رسد.
+2. MinHash → کمبود overlap shingle (FN)؛ SimHash → similarity ساختاری بدون equivalence معنایی (FP).
+3. ترکیب وزن‌دار $\alpha \cdot J_{minhash} + (1-\alpha) \cdot sim_{simhash}$ می‌تواند هر دو نوع خطا را کاهش دهد.
 
 ---
 
@@ -349,17 +295,18 @@ embedding معنایی نمی‌تواند این رابطه را کشف کند.
 ```
 src/plagiarism_engine/
 ├── __init__.py
-├── preprocessing.py     # نرمال‌سازی، tokenization، shingles
+├── preprocessing.py     # normalize, tokenize, shingles
 ├── minhash.py           # MinHasher با universal hashing
-├── lsh.py               # LSHIndex با banding و bucket dictهای دینامیک
+├── lsh.py               # LSHIndex با banding و bucket
 ├── simhash.py           # SimHasher با TF-IDF، vectorized
-├── dataset.py           # corpus loader و pairs csv loader
+├── dataset.py           # corpus loader، pairs csv loader
 ├── evaluation.py        # P/R/F1، timing، sweep
 └── cli.py               # argparse با ۳ subcommand
 tests/
 └── test_engine.py       # ۱۴ unit test، همه pass
 scripts/
-└── extract_errors.py    # ابزار جانبی برای تحلیل خطا
+├── build_pdf.py         # markdown → PDF (chrome headless)
+└── extract_errors.py    # ابزار تحلیل خطا
 outputs/
 ├── metrics.csv          # نتایج کامل
 ├── candidates.csv       # خروجی corpus mode
@@ -371,17 +318,3 @@ outputs/
 pytest -q
 # 14 passed in 0.28s
 ```
-
----
-
-## ۱۰. کارهای آتی پیشنهادی
-
-1. اضافه کردن sentence-level embedding (مثل sentence-BERT) به‌عنوان مسیر سوم
-   و ترکیب با MinHash/SimHash برای پوشش هر دو نوع خطا.
-2. پیاده‌سازی character n-gram به‌جای word shingle برای زبان‌هایی با
-   tokenization پیچیده (فارسی، چینی) و کلمات با املای متفاوت.
-3. caching signatureها روی disk با joblib برای جلوگیری از recomputation.
-4. ارزیابی روی PAN-PC-11 و گزارش precision/recall در سطح passage-level (نه
-   pair-level).
-5. آستانه‌ی adaptive بر اساس طول سند: متن‌های کوتاه‌تر آستانه‌ی بالاتر
-   نیاز دارند چون SimHash روی متن کوتاه ناپایدارتر است.
