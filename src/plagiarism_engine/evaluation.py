@@ -126,27 +126,6 @@ def evaluate_simhash_pairs(
     return EvalResult("simhash", threshold, p, r, f, tp, fp, fn, tn, rt)
 
 
-def sweep_thresholds(
-    df: pd.DataFrame,
-    method: str = "minhash",
-    grid: Sequence[float] | None = None,
-    **kwargs,
-) -> List[dict]:
-    """small helper: run several thresholds, return list of rows."""
-    if grid is None:
-        grid = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
-    rows = []
-    for t in grid:
-        if method == "minhash":
-            res = evaluate_minhash_pairs(df, threshold=t, **kwargs)
-        elif method == "simhash":
-            res = evaluate_simhash_pairs(df, threshold=t, **kwargs)
-        else:
-            raise ValueError(method)
-        rows.append(res.as_row())
-    return rows
-
-
 def lsh_candidates_for_corpus(
     texts: Sequence[str],
     num_perm: int = 128,

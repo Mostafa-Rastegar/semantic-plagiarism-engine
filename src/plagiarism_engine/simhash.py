@@ -160,9 +160,3 @@ class SimHasher:
     def sign(self, tokens: Sequence[str]) -> int:
         ng = ngrams(tokens, self.ngram)
         return simhash_signature_fast(ng, self.idf)
-
-    def sign_corpus(self, corpus_tokens: Sequence[Sequence[str]]) -> List[int]:
-        # use cached ngrams when possible
-        if getattr(self, "_cached", None) and len(self._cached) == len(corpus_tokens):
-            return [simhash_signature_fast(ng, self.idf) for ng in self._cached]
-        return [self.sign(t) for t in corpus_tokens]
