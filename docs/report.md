@@ -233,9 +233,27 @@ SimHash در آستانه‌های پایین recall نزدیک ۱ دارد ول
 
 ## ۸. تحلیل خطا
 
-اسکریپت `scripts/extract_errors.py` با آستانه‌ی بهینه‌ی هر روش جفت‌های اشتباه را استخراج کرده و در `outputs/error_examples.json` ذخیره می‌کند.
+اسکریپت `scripts/extract_errors.py` با آستانه‌ی بهینه‌ی هر روش (MinHash در $t=0.20$، SimHash در $t=0.60$) جفت‌های اشتباه را استخراج کرده و در `outputs/error_examples.json` ذخیره می‌کند. در ادامه چند نمونه‌ی مشخص از خطاها بررسی و علت فنی آن‌ها توضیح داده می‌شود.
 
-### MinHash — False Positive (پیش‌بینی duplicate، برچسب ۰)
+### ۸.۱ بررسی مورد به مورد
+
+**نمونه FP گویا (تفاوت معنایی با یک کلمه‌ی متضاد):**
+
+- Q1: *"How can I lose weight quickly?"*
+- Q2: *"How can I gain weight quickly?"*
+- شباهت MinHash: $0.31$، شباهت SimHash: $0.66$ — هر دو روش این جفت را duplicate پیش‌بینی می‌کنند در حالی که برچسب واقعی $0$ است.
+- **علت فنی:** بیش از ۹۰٪ توکن‌ها و شینگل‌های ۲-تایی مشترک‌اند. تنها تفاوت یک کلمه‌ی متضاد (`lose` در برابر `gain`) است که کل معنای جمله را برعکس می‌کند. هش‌کردن token-level (چه در MinHash روی shingle و چه در SimHash روی unigram) هیچ ابزاری برای درک تضاد معنایی ندارد. TF-IDF هم کمکی نمی‌کند چون هر دو کلمه در corpus فرکانس مشابه دارند و وزن نزدیک به هم می‌گیرند.
+
+**نمونه FN گویا (paraphrase با vocabulary کاملاً متفاوت):**
+
+- Q1: *"What is the best way to learn Python?"*
+- Q2: *"How should a beginner start with Python programming?"*
+- شباهت MinHash: $0.0$، شباهت SimHash: $0.55$ — هر دو زیر آستانه‌ی بهینه، پس هر دو مثبت واقعی را از دست می‌دهند (FN).
+- **علت فنی:** فقط توکن `python` مشترک است. shingle ۲-تایی حتی همان را از دست می‌دهد چون کلمه‌ی مجاور در دو جمله متفاوت است. جاکارد واقعی نزدیک صفر است، پس در LSH هم نه در یک bucket قرار می‌گیرند و نه از فیلتر آستانه عبور می‌کنند. SimHash کمی بهتر عمل می‌کند چون به اسکلت جمله نگاه می‌کند، ولی همچنان زیر آستانه می‌ماند. برای این نوع paraphrase نیاز به مسیر معنایی (Sentence-BERT، word embeddingها) هست که در scope این پروژه نبود.
+
+### ۸.۲ نمونه‌های واقعی از خروجی روی ۵۰۰۰ جفت Quora
+
+#### MinHash — False Positive (پیش‌بینی duplicate، برچسب ۰)
 
 | # | Q1 | Q2 | sim |
 |---|----|----|-----|
@@ -246,7 +264,7 @@ SimHash در آستانه‌های پایین recall نزدیک ۱ دارد ول
 
 **تحلیل:** در سه مثال اول Quora دو سؤال را به‌خاطر تفاوت جزئی در یک کلمه (کشور یا شهر) duplicate نمی‌داند، ولی جاکارد بالا است. از دید الگوریتمی این عمالً false positive نیست — تقریباً کل shingle‌ها یکی هستند. این نشان‌دهنده‌ی bias در برچسب‌گذاری Quora است، نه ضعف MinHash.
 
-### MinHash — False Negative (پیش‌بینی ۰، برچسب duplicate)
+#### MinHash — False Negative (پیش‌بینی ۰، برچسب duplicate)
 
 | # | Q1 | Q2 | sim |
 |---|----|----|-----|
@@ -257,7 +275,7 @@ SimHash در آستانه‌های پایین recall نزدیک ۱ دارد ول
 
 **تحلیل:** paraphrase شدید با synonym، تغییر فرم گرامری (mean/means)، تغییر ترتیب. shingle دوتایی هیچ tuple مشترکی پیدا نمی‌کند. محدودیت ذاتی MinHash روی سؤالات کوتاه.
 
-### SimHash — False Positive
+#### SimHash — False Positive
 
 | # | Q1 | Q2 | sim |
 |---|----|----|-----|
@@ -268,7 +286,7 @@ SimHash در آستانه‌های پایین recall نزدیک ۱ دارد ول
 
 **تحلیل:** SimHash به اسکلت جمله حساس است. هر دو جمله ساختار سؤالی مشابه ("how do you X instead of Y") دارند. مدل bag-of-tokens نمی‌فهمد موضوع اصلی متفاوت است. محدودیت ذاتی SimHash بدون semantic embedding.
 
-### SimHash — False Negative
+#### SimHash — False Negative
 
 | # | Q1 | Q2 | sim |
 |---|----|----|-----|
@@ -278,11 +296,11 @@ SimHash در آستانه‌های پایین recall نزدیک ۱ دارد ول
 
 **تحلیل:** نیاز به دانش جهانی (UPSC = civil service exam in India، J.K. Rowling = Harry Potter). هیچ tokenی مشترک نیست. SimHash بدون embedding معنایی این را کشف نمی‌کند.
 
-### همپوشانی خطاها
+### ۸.۳ همپوشانی خطاها
 
 تعداد جفت‌هایی که هر دو روش هم‌زمان اشتباه پیش‌بینی کردند: **۹۷۷ از ۵۰۰۰** (تقریباً $19.5\%$). نتیجه: خطاهای دو روش تا حد خوبی مستقل هستند. ترکیب آن‌ها (Ensemble با OR در آستانه‌های مناسب) می‌تواند recall را بهبود دهد.
 
-### جمع‌بندی تحلیل خطا
+### ۸.۴ جمع‌بندی تحلیل خطا
 
 1. روی متن کوتاه با paraphrase vocabulary-level، هیچ‌یک از دو روش بدون embedding معنایی به F1 بالای $0.7$ نمی‌رسد.
 2. MinHash → کمبود overlap shingle (FN)؛ SimHash → similarity ساختاری بدون equivalence معنایی (FP).
